@@ -1,0 +1,85 @@
+version: '3.8'
+
+# ── Shared network ─────────────────────────────────────────────────────────────
+networks:
+  gpu-forecast-net:
+    driver: bridge
+
+# ── Persistent volumes ─────────────────────────────────────────────────────────
+volumes:
+  mlflow-data:      # MLflow artifact store
+  grafana-storage:  # Grafana internal state
+
+services:
+
+  # ── 1. FastAPI Backend ───────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gpu-forecast-api
+    ports:
+      - "8000:8000"
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5000
+    volumes:
+      # Mount trained models and data so the container reads them directly
+      - ./outputs/models:/app/../outputs/models:ro
+      - ./data:/app/../data:ro
+    depends_on:
+      - mlflow
+    networks:
+      - gpu-forecast-net
+    restart: unless-stopped
+
+  # ── 2. MLflow Tracking Server ────────────────────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.13.0
+    container_name: gpu-forecast-mlflow
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow-data:/mlflow
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:////mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    networks:
+      - gpu-forecast-net
+    restart: unless-stopped
+
+  # ── 3. Grafana Dashboard ─────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: gpu-forecast-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_INSTALL_PLUGINS=yesoreyeram-infinity-datasource
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/dashboards/gpu_forecast.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/etc/grafana/dashboards
+      - grafana-storage:/var/lib/grafana
+    depends_on:
+      - backend
+    networks:
+      - gpu-forecast-net
+    restart: unless-stopped
+
+  # ── 4. Prometheus Metrics Scraper ────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: gpu-forecast-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - gpu-forecast-net
+    restart: unless-stopped

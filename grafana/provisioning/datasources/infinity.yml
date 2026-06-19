@@ -1,0 +1,15 @@
+apiVersion: 1
+
+datasources:
+  - name: FastAPI Forecast API
+    type: yesoreyeram-infinity-datasource
+    access: proxy
+    isDefault: true
+    uid: "fastapi-forecast"
+    jsonData:
+      oauthPassThru: false
+      tlsSkipVerify: true
+      # When running via docker-compose the backend is reachable at http://backend:8000
+      # When running locally (uvicorn), panels use http://localhost:8000 directly
+      # The url below is the base URL used by proxy-mode queries (not used by Infinity panel URLs)
+      url: "http://backend:8000"
