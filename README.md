@@ -145,4 +145,44 @@ Having trouble? Here are the most common fixes! 🚑
 * **Fix**: Ensure your virtual environment is activated (`gpu_env\Scripts\activate`) and you ran `pip install -r requirements.txt`. Install any missing package manually with `pip install <package-name>`.
 
 ---
+
+## 📊 Useful Prometheus Queries
+
+You can use the following queries in the **Prometheus UI** ([http://localhost:9090](http://localhost:9090)) to monitor your resources and predictions in real-time:
+
+### 1. Forecasted GPU vs Live GPU Utilization
+Check how closely the live GPU usage matches what was predicted:
+```promql
+live_gpu_pct
+predicted_gpu_pct
+```
+
+### 2. Live CPU and Load Metrics
+Monitor current CPU and System load constraints:
+```promql
+live_cpu_pct
+predicted_load
+```
+
+### 3. Scaling Actions Recommended
+Track what action the ML model is suggesting over time:
+*(0 = Scale Up, 1 = Scale Down, 2 = Maintain)*
+```promql
+scaling_action_code
+```
+
+### 4. Anomaly Detection
+See if the ML pipeline has flagged any live traffic as an anomaly:
+*(0 = Normal, 1 = Anomaly)*
+```promql
+anomaly_status_code
+```
+
+### 5. API Request Rate
+Monitor the total number of incoming forecast requests per minute:
+```promql
+rate(http_requests_total{status="200"}[1m])
+```
+
+---
 *Built with ❤️ for optimizing Cloud GPU Resources.*
